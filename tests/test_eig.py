@@ -79,25 +79,39 @@ def test_ties_are_broken_randomly_not_by_candidate_order() -> None:
     assert len(picked) > 1, "tie-break collapsed to a fixed candidate"
 
 
-def test_a_factor_that_stops_resolving_is_set_aside() -> None:
+def test_a_factor_is_not_abandoned_after_a_few_unresolved_probes() -> None:
     stuck, _ = _cap_factor([10, 20, 30, 40])
     stuck.name = "stuck"
-    moving, _ = _cap_factor([5, 15, 25, 35])
-    moving.name = "moving"
-    factors = FactorSet(factors=[stuck, moving], endpoints=ENDPOINTS)
+    other, _ = _cap_factor([5, 15, 25])
+    other.name = "other"
+    factors = FactorSet(factors=[stuck, other], endpoints=ENDPOINTS)
 
-    # The stuck factor keeps being targeted without its entropy ever falling.
     for _ in range(3):
         factors.note_target_outcome(stuck, stuck.entropy())
 
-    assert factors.target() is moving, "starved every other factor"
+    # Pinning a parameter takes many more than three probes. Rotating away
+    # here abandons exactly the factors worth pursuing, and halved recall.
+    assert factors.target() is stuck
+
+
+def test_a_factor_consuming_a_whole_run_is_eventually_set_aside() -> None:
+    stuck, _ = _cap_factor([10, 20, 30, 40])
+    stuck.name = "stuck"
+    other, _ = _cap_factor([5, 15, 25])
+    other.name = "other"
+    factors = FactorSet(factors=[stuck, other], endpoints=ENDPOINTS)
+
+    for _ in range(12):
+        factors.note_target_outcome(stuck, stuck.entropy())
+
+    assert factors.target() is other, "backstop never fired"
 
 
 def test_all_factors_stalling_resets_rather_than_returning_nothing() -> None:
     a, _ = _cap_factor([10, 20])
     a.name = "a"
     factors = FactorSet(factors=[a], endpoints=ENDPOINTS)
-    for _ in range(5):
+    for _ in range(14):
         factors.note_target_outcome(a, a.entropy())
 
     assert factors.target() is a

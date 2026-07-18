@@ -131,16 +131,21 @@ class FactorSet:
     def assembled(self) -> list[Rule]:
         return self.pinned_rules(exclude=None)
 
-    def target(self, stall_limit: int = 3) -> Factor | None:
-        """The factor we are least sure about, skipping ones that will not resolve.
+    def target(self, stall_limit: int = 12) -> Factor | None:
+        """The factor we are least sure about.
 
-        Highest entropy alone is a trap. A factor whose truth is "no constraint
-        here" never resolves, so its entropy stays high and it gets chosen for
-        ever while real parameters go unprobed. In one run a single relational
-        factor over a pair with no actual relationship absorbed 45% of the
-        budget. A factor that has been targeted repeatedly without its entropy
-        falling is set aside; if every factor stalls, the counters reset rather
-        than leaving nothing to probe.
+        An earlier version rotated away from any factor that failed to resolve
+        within three probes, on the theory that repeatedly targeting one factor
+        was starving the others. That was backwards. Resolving a parameter
+        means pinning its type and its bounds and its domain and its status
+        code, which takes well more than three probes, so the guard fired on
+        exactly the factors worth pursuing and handed the budget to ones that
+        would never resolve at all. Recall halved.
+
+        Depth is what pays at these budgets: with a 100-probe budget spread
+        over a dozen factors there is barely enough for one parameter to be
+        pinned down properly. The limit is kept only as a backstop against a
+        factor that consumes an entire run.
         """
         live = [f for f in self.factors if len(f.particles) > 1]
         if not live:

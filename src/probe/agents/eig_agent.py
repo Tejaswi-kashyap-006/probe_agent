@@ -24,9 +24,13 @@ from probe.hypothesis.predicate import endpoint_of
 from probe.hypothesis.propose import build_factors, propose_surface, refill
 from probe.hypothesis.space import FactorSet
 
-MAX_FACTORS = 22
+# Deliberately tight. The budget divided by the factor count is roughly how
+# many probes each parameter gets, and pinning one down properly takes closer
+# to ten than to four. Carrying more factors buys coverage with depth, and at
+# these budgets depth is what actually recovers rules.
+MAX_FACTORS = 10
 MAX_REFILLS_PER_STEP = 2
-REDISCOVER_EVERY = 15
+REDISCOVER_EVERY = 20
 
 
 class EigAgent(Agent):
@@ -73,7 +77,9 @@ class EigAgent(Agent):
             {"endpoint": endpoint, "param": param}
             for endpoint, param in sorted(self._named_params)
         ]
-        discovered = build_factors(confirmed + params, relations, self.endpoints)
+        discovered = build_factors(
+            confirmed + params, relations, self.endpoints, max_relations=2
+        )
 
         existing = {f.name for f in self.factors.factors}
         room = MAX_FACTORS - len(self.factors.factors)

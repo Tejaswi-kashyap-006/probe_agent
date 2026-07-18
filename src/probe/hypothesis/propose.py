@@ -18,11 +18,12 @@ From the evidence, list the parameters each endpoint plausibly accepts, and the
 pairs of parameters that might be related (one requiring another, or two that
 cannot be sent together).
 
-Be generous with parameters: list at least eight per endpoint, including ones
-you have not confirmed but which an API of this kind plausibly has — filtering,
-sorting, pagination, contact details, status, currency, flags. A parameter you
-fail to name can never be investigated, so missing one is far more costly than
-naming one that turns out not to exist.
+Be selective. Name a parameter only where the evidence points at it: it appeared
+in an error, or a response changed when it was sent, or the endpoint plainly
+implies it. Investigating a parameter properly costs many requests, so a
+speculative name does not merely waste effort, it takes the budget away from a
+parameter that is really there. Four or five well-founded names per endpoint is
+better than a dozen guesses.
 
 Be sparing with relations. Only propose a pair when the evidence actually hints
 at a link between them.
