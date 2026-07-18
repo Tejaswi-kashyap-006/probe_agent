@@ -1,0 +1,134 @@
+{
+  "variant": "easy",
+  "verbosity": "verbose",
+  "probes_enumerated": 40,
+  "total_rules": 17,
+  "achievable_rules": [
+    "products.page.optional",
+    "products.page.type",
+    "products.limit.optional",
+    "products.limit.type",
+    "products.limit.cap",
+    "products.category.enum",
+    "orders.customer_id.required",
+    "orders.customer_id.format",
+    "orders.quantity.required",
+    "orders.quantity.type",
+    "orders.quantity.range",
+    "orders.status.enum",
+    "orders.email.format",
+    "orders.expedited.type",
+    "orders.expedited.requires_phone",
+    "orders.sku_xor_product_id",
+    "orders.lookup.not_found"
+  ],
+  "ceiling": {
+    "all": 1.0,
+    "conventional": 1.0,
+    "counter_prior": 1.0
+  },
+  "rules": {
+    "products.page.optional": {
+      "identifiable": true,
+      "prior_class": "counter_prior",
+      "kind": "optional",
+      "witness_probe": "GET /products {}"
+    },
+    "products.page.type": {
+      "identifiable": true,
+      "prior_class": "conventional",
+      "kind": "type",
+      "witness_probe": "GET /products {\"page\": \"abc\"}"
+    },
+    "products.limit.optional": {
+      "identifiable": true,
+      "prior_class": "conventional",
+      "kind": "optional",
+      "witness_probe": "GET /products {}"
+    },
+    "products.limit.type": {
+      "identifiable": true,
+      "prior_class": "conventional",
+      "kind": "type",
+      "witness_probe": "GET /products {\"limit\": \"abc\"}"
+    },
+    "products.limit.cap": {
+      "identifiable": true,
+      "prior_class": "counter_prior",
+      "kind": "pagination_cap",
+      "witness_probe": "GET /products {}"
+    },
+    "products.category.enum": {
+      "identifiable": true,
+      "prior_class": "counter_prior",
+      "kind": "enum",
+      "witness_probe": "GET /products {\"category\": \"__not_a_member__\"}"
+    },
+    "orders.customer_id.required": {
+      "identifiable": true,
+      "prior_class": "conventional",
+      "kind": "required",
+      "witness_probe": "POST /orders {\"quantity\": 1}"
+    },
+    "orders.customer_id.format": {
+      "identifiable": true,
+      "prior_class": "counter_prior",
+      "kind": "format",
+      "witness_probe": "POST /orders {\"customer_id\": \"definitely not the right format\", \"quantity\": 1}"
+    },
+    "orders.quantity.required": {
+      "identifiable": true,
+      "prior_class": "conventional",
+      "kind": "required",
+      "witness_probe": "POST /orders {\"customer_id\": \"CUS-000123\"}"
+    },
+    "orders.quantity.type": {
+      "identifiable": true,
+      "prior_class": "conventional",
+      "kind": "type",
+      "witness_probe": "POST /orders {\"customer_id\": \"CUS-000123\", \"quantity\": \"abc\"}"
+    },
+    "orders.quantity.range": {
+      "identifiable": true,
+      "prior_class": "counter_prior",
+      "kind": "range",
+      "witness_probe": "POST /orders {\"customer_id\": \"CUS-000123\", \"quantity\": 0}"
+    },
+    "orders.status.enum": {
+      "identifiable": true,
+      "prior_class": "counter_prior",
+      "kind": "enum",
+      "witness_probe": "POST /orders {\"customer_id\": \"CUS-000123\", \"quantity\": 1, \"status\": \"__not_a_member__\"}"
+    },
+    "orders.email.format": {
+      "identifiable": true,
+      "prior_class": "conventional",
+      "kind": "format",
+      "witness_probe": "POST /orders {\"customer_id\": \"CUS-000123\", \"email\": \"definitely not the right format\", \"quantity\": 1}"
+    },
+    "orders.expedited.type": {
+      "identifiable": true,
+      "prior_class": "conventional",
+      "kind": "type",
+      "witness_probe": "POST /orders {\"customer_id\": \"CUS-000123\", \"expedited\": \"true\", \"quantity\": 1}"
+    },
+    "orders.expedited.requires_phone": {
+      "identifiable": true,
+      "prior_class": "conventional",
+      "kind": "conditional_required",
+      "witness_probe": "POST /orders {\"customer_id\": \"CUS-000123\", \"expedited\": true, \"quantity\": 1}"
+    },
+    "orders.sku_xor_product_id": {
+      "identifiable": true,
+      "prior_class": "counter_prior",
+      "kind": "mutual_exclusion",
+      "witness_probe": "POST /orders {\"customer_id\": \"CUS-000123\", \"product_id\": \"x\", \"quantity\": 1, \"sku\": \"x\"}"
+    },
+    "orders.lookup.not_found": {
+      "identifiable": true,
+      "prior_class": "conventional",
+      "kind": "resource_lookup",
+      "witness_probe": "GET /orders/{id} {}"
+    }
+  }
+}
