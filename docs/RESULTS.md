@@ -1,87 +1,105 @@
 # Results
 
-**Status: preliminary. One seed, one variant. This is not yet a result, and the
-headline finding so far is negative.**
+**Status: one variant (`easy`), three seeds, 100-probe budget. The result is
+negative and is reported as it came out.**
 
-The run matrix the design calls for is 4 agents x 3 variants x 3 seeds. What has
-been run is 4 agents x 1 variant x 1 seed. A single run proves nothing, LLM
-sampling is noisy, and every number below should be read as "what happened once"
-rather than "what is true".
+The design calls for 4 agents x 3 variants x 3 seeds. What has been run is
+4 agents x 1 variant x 3 seeds. `medium` and `hard` are untested.
 
-## Head to head: easy variant, seed 0, budget 100 probes
+## easy variant, 3 seeds, 100 probes
 
-| agent | F1 | conventional recall | counter-prior recall | probes | LLM calls | cost |
-|---|---|---|---|---|---|---|
-| random | **0.296** | 0.400 | 0.000 | 100 | 8 | $0.003 |
-| hypothesis | 0.240 | 0.200 | **0.143** | 100 | 110 | $0.068 |
-| react | 0.214 | 0.300 | 0.000 | 100 | 0 (fully cached) | $0.000 |
-| eig | 0.138 | 0.200 | 0.000 | 100 | 70 | $0.048 |
+Mean across seeds, with the range in brackets.
 
-Identifiability ceiling on `easy` is 1.000, so these are fractions of what is
-actually recoverable, not of an unreachable total.
+| agent | F1 | conventional recall | counter-prior recall | LLM calls | cost |
+|---|---|---|---|---|---|
+| random | **0.252** [0.174-0.296] | 0.300 [0.200-0.400] | 0.048 [0.000-0.143] | 7 | $0.006 |
+| react | **0.223** [0.214-0.240] | 0.300 [0.300-0.300] | 0.000 | 126 | $0.072 |
+| eig | 0.140 [0.091-0.174] | 0.167 [0.100-0.200] | 0.000 | 133 | $0.224 |
+| hypothesis | 0.129 [0.095-0.191] | 0.100 [0.000-0.200] | 0.048 [0.000-0.143] | 115 | $0.172 |
 
-## The EIG agent does not win
+The identifiability ceiling on `easy` is 1.000, so these are fractions of what is
+genuinely recoverable.
 
-At one seed on the easiest variant it comes last, below a baseline that sends
-random requests, while costing roughly sixteen times as much as that baseline in
-LLM spend. The thesis is not supported by the evidence gathered so far.
+## The method loses
 
-Two things are worth separating out before anyone reads that as settled.
+The EIG agent is beaten by both baselines, and by a baseline that sends random
+requests, while costing roughly thirty-seven times as much as that baseline in
+LLM spend. The thesis — that explicit hypothesis tracking plus information-
+theoretic probe selection recovers a contract in fewer probes than an LLM told
+to explore — is not supported.
 
-**Random's F1 is partly an artefact of reporting little.** It names few rules, so
-its precision is high and F1 rewards that. It recovers 0.400 of the conventional
-rules — mostly the required-parameter rules, which random requests trip over by
-accident — and 0.000 of the counter-prior ones. It is not recovering a contract;
-it is recalling that missing parameters produce errors.
+Ranges overlap, so the *size* of the gap is not established. The *ordering* is
+more robust than the means suggest: react beats eig on all three seeds
+individually, and random beats eig on all three. Nothing here rescues the method.
 
-**The counter-prior column is the one that matters, and only one agent scores on
-it.** The `hypothesis` agent is the sole arm with non-zero counter-prior recall
-(0.143). That subset is exactly the part of the contract that cannot be guessed
-from convention, so it is the part that measures recovery rather than recall of
-API folklore. That hypothesis tracking scores there while random, ReAct and EIG
-score zero is the most suggestive signal in the data — at n=1, which is to say,
-barely a signal at all.
+## Two earlier claims from this project, retracted
 
-The awkward pairing is that `hypothesis` and `eig` share all their machinery and
-differ only in the selection rule: `hypothesis` picks a candidate probe at random,
-`eig` picks the one that splits the surviving hypotheses most evenly. The ablation
-beating the method suggests the problem is in probe selection specifically rather
-than in hypothesis tracking. Possible explanations, untested:
+Both came from single-seed runs and did not survive three.
 
-- EIG is scored against the target factor with all others pinned. If the pins are
-  wrong, the probe that best splits the target factor may be uninformative about
-  the real contract.
-- Choosing the maximally-splitting probe concentrates effort on whichever factor
-  is currently most uncertain, which may starve the remaining factors. Random
-  selection spreads across them.
-- The candidate pool is small (roughly 9 usable probes per step). Argmax over a
-  weak pool is close to a random draw from it, plus whatever bias the scoring adds.
+**"EIG selection is broken relative to its own ablation."** An earlier run showed
+eig 0.138 against hypothesis 0.240, and a detailed mechanism was diagnosed from
+the traces: tie-breaking bias, a starvation trap, thin factor coverage. On three
+seeds the two agents are indistinguishable — 0.140 [0.091-0.174] against
+0.129 [0.095-0.191]. The gap that motivated the diagnosis was seed noise. The
+subsequent "regression" to 0.065/0.065, which prompted a further round of
+changes, is also inside that variance.
+
+**"Only hypothesis tracking scores on counter-prior rules."** This was called the
+most suggestive signal in the data. On three seeds `random` scores identically
+(0.048 mean, 0.143 on one seed). There is no such effect.
+
+The code changes made in response to those two claims are not thereby shown to be
+wrong, but neither are they shown to be right: they were justified by differences
+that turned out not to be real, and none of them has been measured against a
+proper baseline. Depth-over-coverage, random tie-breaking, and seeding factors
+from error fields are all currently unvalidated.
+
+## Why counter-prior recall is near zero everywhere
+
+No agent recovers the rules that defeat convention: the cap at 37, the 0-indexed
+page, the `sundries` category, the `held` status, the `CUS-######` format. Every
+arm is near zero on that subset while scoring 0.1-0.3 on conventional rules.
+
+This is the design working as intended as a *measurement* — it cleanly separates
+recalling API folklore from recovering a contract — and every agent failing the
+part that matters. A store API's required parameters are guessable; its arbitrary
+constants are not, and none of these agents systematically go looking for them.
+
+## Where the ceiling actually binds
+
+Trace diagnostics show both hypothesis-based agents build factors covering only
+4-5 of the 9 real parameter slots, capping recall near 0.5 before a probe is
+chosen. Whatever is wrong is upstream of probe selection: the agents do not
+work out what the parameters *are*. Selection cannot help with a parameter that
+has no representation.
+
+That is a hypothesis about the failure, not a measured cause, and it is stated
+here as such.
 
 ## Cost
 
-Probe efficiency only matters where probes are the scarce resource. Here they are
-not: all four agents spent exactly their 100-probe budget, and the differences are
-in tokens. The EIG agent spends far more per probe than ReAct or random, and at
-present buys nothing with it.
+Probes were never the scarce resource in these runs: all four agents spent their
+full 100-probe budget, so no arm can claim probe efficiency. The differences are
+entirely in tokens, and the two arms that spend the most tokens produce the worst
+contracts. Under the stated scope of the efficiency claim, where probes are free
+this design has nothing to offer over ReAct.
 
-The `react` row shows $0.000 because that trajectory was already in the LLM disk
-cache; its true first-run cost was $0.033 for 161 calls.
+## Not yet measured
 
-## What is not yet measured
-
-- **Medium and hard variants.** The interesting claim was always that priors matter
-  most where error messages say least. Untested.
-- **Seeds 1 and 2.** Everything above is a single sample.
-- **Wasted-probe rate.** Requires the frozen referee, which is specified but not yet
-  built, so the metric is deliberately absent from the table above rather than
-  computed against incomparable per-agent beliefs.
-- **Probes to 80% recall.** No arm reached 80% recall, so the column is empty.
+- **`medium` and `hard` variants.** The claim that priors matter most where error
+  messages say least is completely untested, and it is the most interesting one.
+- **Wasted-probe rate.** Requires the frozen referee, which is specified but not
+  built. Deliberately absent rather than computed against incomparable beliefs.
+- **Probes to 80% recall.** No arm came close to 80%, so the column is empty.
 
 ## Honest reading
 
-If these numbers survive the full matrix, the finding is that explicit hypothesis
-tracking shows a small advantage on exactly the rules that defeat memorised
-convention, and that information-theoretic probe selection on top of it does not
-help and may hurt. That is a publishable result and it is not the one the design
-expected. It should not be reported as a win, and the design does not permit
-tuning until it becomes one.
+On the easiest variant, with the most informative error messages, a factored
+hypothesis space with EIG-driven probe selection performs worse than random
+probing and worse than a plain ReAct loop, at many times the cost. Three seeds is
+thin, and one variant is thinner, but nothing in the data points the other way.
+
+The remaining open question worth spending money on is `hard`: if the ordering
+inverts where errors stop naming fields, the method has a defensible niche. If it
+does not, the honest conclusion is that this approach does not work at this scale
+and budget, and the write-up should say so.
