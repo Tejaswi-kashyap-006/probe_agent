@@ -63,6 +63,47 @@ def test_best_probe_prefers_the_even_split_over_the_lopsided_one() -> None:
     assert sorted(buckets.values()) == [2.0, 2.0]
 
 
+def test_ties_are_broken_randomly_not_by_candidate_order() -> None:
+    import random
+
+    factor, factors = _cap_factor([10, 20, 30, 40])
+    # Every candidate is under every cap, so all score zero and all tie.
+    tied = [Probe("GET", "/products", params={"limit": n}) for n in (1, 2, 3, 4, 5)]
+
+    picked = {
+        best_probe(tied, factor, factors, random.Random(s))[0].params["limit"]
+        for s in range(40)
+    }
+    # Taking candidates[0] on a tie means always sending the model's first
+    # suggestion, which is systematically the most conventional probe.
+    assert len(picked) > 1, "tie-break collapsed to a fixed candidate"
+
+
+def test_a_factor_that_stops_resolving_is_set_aside() -> None:
+    stuck, _ = _cap_factor([10, 20, 30, 40])
+    stuck.name = "stuck"
+    moving, _ = _cap_factor([5, 15, 25, 35])
+    moving.name = "moving"
+    factors = FactorSet(factors=[stuck, moving], endpoints=ENDPOINTS)
+
+    # The stuck factor keeps being targeted without its entropy ever falling.
+    for _ in range(3):
+        factors.note_target_outcome(stuck, stuck.entropy())
+
+    assert factors.target() is moving, "starved every other factor"
+
+
+def test_all_factors_stalling_resets_rather_than_returning_nothing() -> None:
+    a, _ = _cap_factor([10, 20])
+    a.name = "a"
+    factors = FactorSet(factors=[a], endpoints=ENDPOINTS)
+    for _ in range(5):
+        factors.note_target_outcome(a, a.entropy())
+
+    assert factors.target() is a
+    assert a.stalls == 0
+
+
 def test_entropy_of_an_even_partition_is_log2_of_its_width() -> None:
     assert entropy({"a": 1, "b": 1, "c": 1, "d": 1}) == 2.0
     assert entropy({"a": 3}) == 0.0

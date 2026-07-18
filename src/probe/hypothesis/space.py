@@ -45,6 +45,8 @@ class Factor:
     particles: list[Particle] = field(default_factory=list)
     deaths: int = 0
     reproposals: int = 0
+    targeted: int = 0
+    stalls: int = 0
     _map_cache: tuple[Rule, ...] | None = None
 
     def add(self, particles: list[Particle]) -> None:
@@ -129,10 +131,35 @@ class FactorSet:
     def assembled(self) -> list[Rule]:
         return self.pinned_rules(exclude=None)
 
-    def target(self) -> Factor | None:
-        """The factor we are least sure about."""
+    def target(self, stall_limit: int = 3) -> Factor | None:
+        """The factor we are least sure about, skipping ones that will not resolve.
+
+        Highest entropy alone is a trap. A factor whose truth is "no constraint
+        here" never resolves, so its entropy stays high and it gets chosen for
+        ever while real parameters go unprobed. In one run a single relational
+        factor over a pair with no actual relationship absorbed 45% of the
+        budget. A factor that has been targeted repeatedly without its entropy
+        falling is set aside; if every factor stalls, the counters reset rather
+        than leaving nothing to probe.
+        """
         live = [f for f in self.factors if len(f.particles) > 1]
-        return max(live, key=lambda f: f.entropy()) if live else None
+        if not live:
+            return None
+
+        moving = [f for f in live if f.stalls < stall_limit]
+        if not moving:
+            for factor in live:
+                factor.stalls = 0
+            moving = live
+        return max(moving, key=lambda f: f.entropy())
+
+    def note_target_outcome(self, factor: Factor, entropy_before: float) -> None:
+        """Record whether probing this factor actually reduced its uncertainty."""
+        factor.targeted += 1
+        if factor.entropy() >= entropy_before:
+            factor.stalls += 1
+        else:
+            factor.stalls = 0
 
     def predict_with(self, factor: Factor, particle: Particle, probe: Probe) -> str:
         rules = list(particle.rules) + self.pinned_rules(exclude=factor.name)

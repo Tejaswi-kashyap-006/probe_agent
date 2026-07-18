@@ -18,8 +18,14 @@ From the evidence, list the parameters each endpoint plausibly accepts, and the
 pairs of parameters that might be related (one requiring another, or two that
 cannot be sent together).
 
-Include parameters you have not yet confirmed but which an API like this
-plausibly has. Guessing wrongly is cheap here; missing one is not.
+Be generous with parameters: list at least eight per endpoint, including ones
+you have not confirmed but which an API of this kind plausibly has — filtering,
+sorting, pagination, contact details, status, currency, flags. A parameter you
+fail to name can never be investigated, so missing one is far more costly than
+naming one that turns out not to exist.
+
+Be sparing with relations. Only propose a pair when the evidence actually hints
+at a link between them.
 
 Reply with JSON:
 {"parameters":[{"endpoint":"POST /orders","param":"quantity"}, ...],
@@ -71,8 +77,17 @@ def build_factors(
     params: list[dict[str, str]],
     relations: list[dict[str, str]],
     endpoints: tuple[str, ...],
+    max_relations: int = 4,
 ) -> FactorSet:
+    """Parameter factors first, then a few relational ones.
+
+    Ordering matters because the caller caps how many factors it will carry.
+    Relational factors are cheap to propose and expensive to resolve, so
+    letting them crowd out parameter factors leaves real parameters with no
+    representation at all and caps recall before probing starts.
+    """
     factors: list[Factor] = []
+    relational: list[Factor] = []
     seen: set[str] = set()
 
     for item in params:
@@ -92,11 +107,11 @@ def build_factors(
         name = f"{item['endpoint']}::rel::{pair}"
         if name not in seen:
             seen.add(name)
-            factors.append(
+            relational.append(
                 Factor(name=name, endpoint=item["endpoint"], kind="relational")
             )
 
-    return FactorSet(factors=factors, endpoints=endpoints)
+    return FactorSet(factors=factors + relational[:max_relations], endpoints=endpoints)
 
 
 def _describe(factor: Factor) -> str:

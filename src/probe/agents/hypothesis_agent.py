@@ -38,6 +38,7 @@ class HypothesisAgent(EigAgent):
         )
         candidates = [p for p in candidates if p.key() not in set(self._sent)]
 
+        entropy_before = target.entropy()
         probe = self._rng.choice(candidates) if candidates else self._fallback_probe()
 
         # Scored only so the trace can show what this choice was worth; the
@@ -61,5 +62,6 @@ class HypothesisAgent(EigAgent):
         for event in self.factors.eliminate(probe, result, only=target.name):
             self.trace.write("hypothesis_death", **event)
 
+        self.factors.note_target_outcome(target, entropy_before)
         self.factors.refresh_map()
         self._refill_empty()

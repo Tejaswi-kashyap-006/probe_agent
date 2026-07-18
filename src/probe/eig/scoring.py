@@ -13,6 +13,7 @@ those are exactly the probes the naive agents spend their budget on.
 
 from __future__ import annotations
 
+import random
 from collections import defaultdict
 from math import log2
 
@@ -41,13 +42,24 @@ def eig(probe: Probe, factor: Factor, factors: FactorSet) -> float:
 
 
 def best_probe(
-    probes: list[Probe], factor: Factor, factors: FactorSet
+    probes: list[Probe],
+    factor: Factor,
+    factors: FactorSet,
+    rng: random.Random | None = None,
 ) -> tuple[Probe | None, float, dict[str, float]]:
-    """The candidate that splits the target factor most evenly."""
-    best: tuple[Probe | None, float, dict[str, float]] = (None, -1.0, {})
-    for probe in probes:
-        buckets = partition(probe, factor, factors)
-        score = entropy(buckets)
-        if score > best[1]:
-            best = (probe, score, buckets)
-    return best
+    """The candidate that splits the target factor most evenly.
+
+    Ties are broken at random, not by candidate order. Most steps produce a tie
+    — often every candidate scores zero — and taking the first candidate then
+    means always sending whichever probe the model happened to suggest first,
+    which is systematically the most conventional one. That is a worse policy
+    than an arbitrary pick, and it was costing the agent real information.
+    """
+    if not probes:
+        return (None, -1.0, {})
+
+    scored = [(p, entropy(partition(p, factor, factors))) for p in probes]
+    top = max(score for _, score in scored)
+    winners = [p for p, score in scored if score == top]
+    chosen = (rng or random).choice(winners)
+    return (chosen, top, partition(chosen, factor, factors))

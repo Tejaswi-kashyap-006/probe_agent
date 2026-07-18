@@ -20,10 +20,11 @@ from probe.agents.base import Agent
 from probe.client import Probe
 from probe.eig.candidates import propose_probes
 from probe.eig.scoring import best_probe, eig
+from probe.hypothesis.predicate import endpoint_of
 from probe.hypothesis.propose import build_factors, propose_surface, refill
 from probe.hypothesis.space import FactorSet
 
-MAX_FACTORS = 16
+MAX_FACTORS = 22
 MAX_REFILLS_PER_STEP = 2
 REDISCOVER_EVERY = 15
 
@@ -36,6 +37,7 @@ class EigAgent(Agent):
         self._rng = random.Random(self.seed)
         self.factors = FactorSet(endpoints=self.endpoints)
         self._sent: list[str] = []
+        self._named_params: set[tuple[str, str]] = set()
         self._floor = 8
         self._bootstrapped = False
 
@@ -65,7 +67,13 @@ class EigAgent(Agent):
         params, relations = propose_surface(
             self.llm, self.endpoints, self.evidence.render()
         )
-        discovered = build_factors(params, relations, self.endpoints)
+        # A parameter the API named in an error definitely exists, which is
+        # better evidence than anything the model can guess. These go first.
+        confirmed = [
+            {"endpoint": endpoint, "param": param}
+            for endpoint, param in sorted(self._named_params)
+        ]
+        discovered = build_factors(confirmed + params, relations, self.endpoints)
 
         existing = {f.name for f in self.factors.factors}
         room = MAX_FACTORS - len(self.factors.factors)
@@ -106,7 +114,8 @@ class EigAgent(Agent):
         )
         candidates = [p for p in candidates if p.key() not in set(self._sent)]
 
-        probe, score, buckets = best_probe(candidates, target, self.factors)
+        entropy_before = target.entropy()
+        probe, score, buckets = best_probe(candidates, target, self.factors, self._rng)
         if probe is None:
             probe = self._fallback_probe()
             score, buckets = 0.0, {}
@@ -131,6 +140,7 @@ class EigAgent(Agent):
         for event in events:
             self.trace.write("hypothesis_death", **event)
 
+        self.factors.note_target_outcome(target, entropy_before)
         self.factors.refresh_map()
         self._refill_empty()
 
@@ -141,7 +151,12 @@ class EigAgent(Agent):
 
     def _send(self, probe: Probe) -> Any:
         self._sent.append(probe.key())
-        return self.observe(probe)
+        result = self.observe(probe)
+        if result is not None and result.fields:
+            endpoint = endpoint_of(probe, self.endpoints)
+            for param in result.fields:
+                self._named_params.add((endpoint, param))
+        return result
 
     def _fallback_probe(self) -> Probe:
         """Something unsent, when the model offers nothing usable."""
@@ -188,3 +203,4 @@ class EigAgent(Agent):
     def report_contract(self) -> list[dict[str, Any]]:
         """The MAP contract. No LLM call: this is simply what it believes."""
         return self.factors.reported_rules()
+

@@ -34,7 +34,7 @@ def _params_of(probe: Probe) -> dict[str, Any]:
     return dict(probe.body) if probe.body is not None else dict(probe.params)
 
 
-def _endpoint_of(probe: Probe, endpoints: tuple[str, ...]) -> str:
+def endpoint_of(probe: Probe, endpoints: tuple[str, ...]) -> str:
     for endpoint in endpoints:
         method, path = endpoint.split(" ", 1)
         if method != probe.method:
@@ -50,7 +50,7 @@ def predict(
     rules: list[Rule], probe: Probe, endpoints: tuple[str, ...]
 ) -> str:
     """The outcome class these rules imply for this probe."""
-    endpoint = _endpoint_of(probe, endpoints)
+    endpoint = endpoint_of(probe, endpoints)
     params = _params_of(probe)
     relevant = [r for r in rules if r.endpoint == endpoint]
 
@@ -92,3 +92,4 @@ def observed_class(result: ProbeResult) -> str:
     ):
         return TRUNCATED
     return OK
+
