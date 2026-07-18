@@ -174,10 +174,29 @@ def _format_signature(pattern: Any) -> tuple[bool, ...]:
     return tuple(bool(compiled.fullmatch(s)) for s in FORMAT_CORPUS)
 
 
-def normalize(rule: dict[str, Any]) -> NormRule | None:
+def endpoint_hints(truth: list[dict[str, Any]]) -> dict[str, str]:
+    """Map a bare path to its endpoint, where that path has only one method.
+
+    Models routinely report `/orders` for `POST /orders`. That is a difference
+    in notation, not in belief, so it must not read as a hallucination.
+    """
+    by_path: dict[str, set[str]] = {}
+    for rule in truth:
+        endpoint = _norm_endpoint(_get(rule, "endpoint", "route", "path"))
+        parts = endpoint.split(" ", 1)
+        if len(parts) == 2:
+            by_path.setdefault(parts[1], set()).add(endpoint)
+    return {path: next(iter(v)) for path, v in by_path.items() if len(v) == 1}
+
+
+def normalize(
+    rule: dict[str, Any], hints: dict[str, str] | None = None
+) -> NormRule | None:
     """Reduce one rule dict to comparable form. Returns None if unintelligible."""
     kind = _norm_kind(rule.get("kind"))
     endpoint = _norm_endpoint(_get(rule, "endpoint", "route", "path"))
+    if " " not in endpoint and hints:
+        endpoint = hints.get(endpoint, endpoint)
     param = str(_get(rule, "param", "parameter", "field", "name") or "").strip()
     status = _get(rule, "status", "status_code", "http_status")
     status = status if isinstance(status, int) and not isinstance(status, bool) else None
@@ -313,6 +332,7 @@ def _f1(precision: float, recall: float) -> float:
 def score(
     reported: list[dict[str, Any]],
     truth: list[dict[str, Any]],
+    hints: dict[str, str] | None = None,
 ) -> Score:
     """Precision, recall and F1 of a reported contract against ground truth.
 
@@ -321,8 +341,10 @@ def score(
     accuracy. Scoring it as identity would penalise the same mistake twice,
     once as a miss and once as a hallucination.
     """
-    truth_norm = [n for n in (normalize(r) for r in truth) if n is not None]
-    reported_norm = [n for n in (normalize(r) for r in reported) if n is not None]
+    if hints is None:
+        hints = endpoint_hints(truth)
+    truth_norm = [n for n in (normalize(r, hints) for r in truth) if n is not None]
+    reported_norm = [n for n in (normalize(r, hints) for r in reported) if n is not None]
 
     unmatched = list(truth_norm)
     matched: list[tuple[NormRule, NormRule]] = []
@@ -376,16 +398,20 @@ def score_by_subset(
     The counter_prior subset is the one that separates recovering a contract
     from recalling API conventions, so it is always reported on its own.
     """
+    # Built from the full truth so that subset scoring keeps the same notation
+    # resolution as the overall score.
+    hints = endpoint_hints(truth)
+
     if achievable is not None:
         truth = [r for r in truth if r.get("id") in achievable]
 
-    result: dict[str, Any] = {"all": score(reported, truth).as_dict()}
+    result: dict[str, Any] = {"all": score(reported, truth, hints).as_dict()}
     for subset in ("conventional", "counter_prior"):
         subset_truth = [r for r in truth if r.get("prior_class") == subset]
         if subset_truth:
             # Hallucinations cannot be attributed to a subset, so subset
             # precision is left out and only recall is meaningful here.
-            subset_score = score(reported, subset_truth)
+            subset_score = score(reported, subset_truth, hints)
             result[subset] = {
                 "recall": round(subset_score.recall, 4),
                 "found": subset_score.true_positives,

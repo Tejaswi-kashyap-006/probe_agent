@@ -137,6 +137,31 @@ def test_mutual_exclusion_is_unordered() -> None:
     assert score([paraphrase], [truth]).recall == 1.0
 
 
+def test_endpoint_without_a_method_matches_when_the_path_is_unambiguous() -> None:
+    # Models routinely write "/orders" for "POST /orders". That is notation,
+    # not disagreement, and scoring it as a hallucination hides real recoveries.
+    paraphrase = {"endpoint": "/orders", "kind": "required", "param": "customer_id"}
+    assert score([paraphrase], [CUSTOMER_REQUIRED]).recall == 1.0
+
+
+def test_method_less_endpoint_stays_unmatched_when_the_path_is_ambiguous() -> None:
+    get_rule = {
+        "id": "a", "endpoint": "GET /orders", "kind": "required", "param": "x",
+    }
+    post_rule = {
+        "id": "b", "endpoint": "POST /orders", "kind": "required", "param": "x",
+    }
+    ambiguous = {"endpoint": "/orders", "kind": "required", "param": "x"}
+    result = score([ambiguous], [get_rule, post_rule])
+    assert result.true_positives == 0
+
+
+def test_subset_recall_survives_method_less_endpoints() -> None:
+    report = [{"endpoint": "/orders", "kind": "required", "param": "customer_id"}]
+    result = score_by_subset(report, TRUTH)
+    assert result["conventional"]["found"] == 1
+
+
 # --- subtly wrong rules must NOT match --------------------------------------
 
 
