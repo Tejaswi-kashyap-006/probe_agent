@@ -216,12 +216,12 @@ def check(contract: Contract) -> dict[str, Any]:
 
 
 def main() -> None:
-    from target_api.variants.easy import CONTRACT as EASY
+    from target_api.variants import VARIANTS
 
     out_dir = Path(__file__).resolve().parent.parent / "artifacts"
     out_dir.mkdir(exist_ok=True)
 
-    for contract in (EASY,):
+    for contract in VARIANTS.values():
         report = check(contract)
         path = out_dir / f"identifiability_{contract.name}.json"
         path.write_text(json.dumps(report, indent=2), encoding="utf-8")

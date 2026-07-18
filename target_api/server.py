@@ -15,10 +15,8 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from target_api.contract import Contract, evaluate
-from target_api.variants.easy import CONTRACT as EASY_CONTRACT
-
-VARIANTS: dict[str, Contract] = {"easy": EASY_CONTRACT}
+from target_api.contract import evaluate
+from target_api.variants import VARIANTS
 
 VARIANT_NAME = os.environ.get("PROBE_VARIANT", "easy")
 if VARIANT_NAME not in VARIANTS:
