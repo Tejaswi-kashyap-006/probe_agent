@@ -8,7 +8,7 @@ both the HTTP server and the offline identifiability check.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from enum import Enum
 from typing import Any
 
@@ -99,6 +99,19 @@ class Rule:
     param_a: str | None = None
     param_b: str | None = None
     cap: int | None = None
+
+
+def rule_as_dict(rule: Rule) -> dict[str, Any]:
+    """Serialise a rule to the plain dicts the scorer consumes.
+
+    The scorer must not import the ground truth, so it is handed data instead.
+    """
+    out = asdict(rule)
+    out["kind"] = rule.kind.value
+    out["prior_class"] = rule.prior_class.value
+    if rule.values is not None:
+        out["values"] = list(rule.values)
+    return {k: v for k, v in out.items() if v is not None}
 
 
 @dataclass(frozen=True)
