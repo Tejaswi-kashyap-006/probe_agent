@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any
 
 from probe.agents.base import Agent, RunResult
+from probe.agents.eig_agent import EigAgent
+from probe.agents.hypothesis_agent import HypothesisAgent
 from probe.agents.random_agent import RandomAgent
 from probe.agents.react_agent import ReactAgent
 from probe.client import ProbeClient
@@ -22,6 +24,8 @@ from probe.trace import Trace
 AGENTS: dict[str, type[Agent]] = {
     "random": RandomAgent,
     "react": ReactAgent,
+    "hypothesis": HypothesisAgent,
+    "eig": EigAgent,
 }
 
 ENDPOINTS = ("GET /products", "POST /orders", "GET /orders/{id}")
