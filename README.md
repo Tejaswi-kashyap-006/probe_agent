@@ -49,13 +49,29 @@ Writes `artifacts/identifiability_<variant>.json`.
 
 | Milestone | State |
 |---|---|
-| M1 target API, easy variant, identifiability | done |
-| M2 client + probe budget | not started |
-| M3 contract scoring | not started |
-| M4 random + ReAct baselines | not started |
-| M5 hypothesis machinery | not started |
-| M6 EIG agent | not started |
-| M7 experiment matrix | not started |
-| M8 visualisations | not started |
+| M1 target API, all three variants, identifiability | done |
+| M2 client + probe budget + LLM token ceiling | done |
+| M3 contract scoring | done |
+| M4 random + ReAct baselines, counter-prior check | done |
+| M5 factored hypothesis machinery + safety tests | done |
+| M6 EIG agent | done |
+| M7 experiment matrix | **partial** — 1 variant, 1 seed; full matrix not run |
+| M8 visualisations | done |
 
-`CLAUDE.md` is the build spec.
+```bash
+python -m pytest                                    # 56 tests
+python scripts/run_experiment.py --agent eig --variant easy --budget 100
+python scripts/make_figures.py --variant easy
+```
+
+Runs are cached by prompt, so re-running an experiment costs nothing and
+reproduces the same numbers.
+
+**Current finding is negative.** At one seed on the easy variant the EIG agent
+comes last, below a random baseline. The ablation that keeps hypothesis tracking
+but drops EIG selection is the only arm to score on counter-prior rules. See
+[docs/RESULTS.md](docs/RESULTS.md) — it is one sample and settles nothing, but it
+is not being tuned away.
+
+`CLAUDE.md` is the build spec. [docs/METHOD.md](docs/METHOD.md) explains the three
+ideas the implementation expresses.

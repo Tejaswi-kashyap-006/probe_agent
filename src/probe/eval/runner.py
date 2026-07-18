@@ -74,6 +74,8 @@ def run_one(
         client.close()
 
     summary = summarize(result, truth, achievable)
+    for point in summary["recovery_curve"]:
+        trace.write("checkpoint_score", **point)
     trace.write("score", **summary["score"])
     trace.close()
     summary["trace"] = str(trace_path)
@@ -88,16 +90,18 @@ def summarize(
     """Final score plus the recovery curve across checkpoints."""
     final = score_by_subset(result.reported_contract, truth, achievable)
 
-    curve = [
-        {
-            "probes": cp["probes"],
-            **{
-                "recall": score_by_subset(cp["rules"], truth, achievable)["all"]["recall"],
-                "f1": score_by_subset(cp["rules"], truth, achievable)["all"]["f1"],
-            },
-        }
-        for cp in result.checkpoints
-    ]
+    curve = []
+    for checkpoint in result.checkpoints:
+        scored = score_by_subset(checkpoint["rules"], truth, achievable)["all"]
+        curve.append(
+            {
+                "probes": checkpoint["probes"],
+                "recall": scored["recall"],
+                "f1": scored["f1"],
+                # Drives the reveal schedule of the declassification race.
+                "matched_rule_ids": scored["matched_rule_ids"],
+            }
+        )
 
     target = next((c["probes"] for c in curve if c["recall"] >= 0.8), None)
 
